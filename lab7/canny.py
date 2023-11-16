@@ -113,7 +113,7 @@ class CannyView:
 
 
 if __name__ == '__main__':
-    img_path = '../imgs/ellipse.png'
+    img_path = '../imgs/triangle.jpg'
 
     canny_view = CannyView(img_path)
     canny_view.run()
