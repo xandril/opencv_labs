@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-class CannyView:
+class CannyViewModel:
     def __init__(self, img_path: str):
         self._img = cv2.imread(img_path)
         self._img_name = "Image"
@@ -115,6 +115,6 @@ class CannyView:
 if __name__ == '__main__':
     img_path = '../imgs/triangle.jpg'
 
-    canny_view = CannyView(img_path)
-    canny_view.run()
-    canny_view.clear()
+    canny_view_model = CannyViewModel(img_path)
+    canny_view_model.run()
+    canny_view_model.clear()
