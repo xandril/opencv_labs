@@ -15,10 +15,9 @@ from warp import warp_perspective
 class Model:
     on_values_changed: Callable[[Model], None]
 
-    blockSize: int = 2
-    ksize: int = 3
-    k: float = 0.04
-    threshold: float = 0.01
+    maxCorners: int = 10
+    qualityLevel: float = 0.01
+    minDistance: float = 10.0
 
     rotation: int = 0
 
@@ -28,23 +27,16 @@ class Model:
     alpha: float = 1.0
     beta: int = 0
 
-    def set_blockSize(self, value: int) -> None:
-        self.blockSize = max(1, value)
+    def set_maxCorners(self, value: int) -> None:
+        self.maxCorners = max(1, value)
         self.on_values_changed(self)
 
-    def set_ksize(self, value: int) -> None:
-        if value % 2 == 0:
-            value += 1
-
-        self.ksize = min(31, max(1, value))
+    def set_qualityLevel(self, value_times_1000: int) -> None:
+        self.qualityLevel = max(1e-5, value_times_1000 / 1000)
         self.on_values_changed(self)
 
-    def set_k(self, value: int) -> None:
-        self.k = max(0.001, value / 1000)
-        self.on_values_changed(self)
-
-    def set_threshold(self, value: int) -> None:
-        self.threshold = max(0.001, value / 1000)
+    def set_minDistance(self, value: int) -> None:
+        self.minDistance = max(1.0, float(value))
         self.on_values_changed(self)
 
     def set_rotation(self, value: int) -> None:
@@ -69,10 +61,13 @@ class Model:
 
 
 def draw_corners(image_gray: np.ndarray, target: np.ndarray, model_: Model) -> np.ndarray:
-    result = cv.cornerHarris(image_gray.astype('float32'), model_.blockSize, model_.ksize, model_.k)
-    result = cv.dilate(result, None)
+    corners = cv.goodFeaturesToTrack(image_gray, model_.maxCorners, model_.qualityLevel, model_.minDistance)
+    if corners is None:
+        return target
 
-    target[result > model_.threshold * result.max()] = (32, 255, 32)
+    for i in corners:
+        x, y = i.ravel().astype('int32')
+        target = cv.circle(target, (x, y), radius=3, color=(255, 64, 64), thickness=2)
 
     return target
 
@@ -86,7 +81,6 @@ def main(file_path: Path) -> None:
 
     image = shrink_to_fit(image, (1200, 600))
 
-    image = shrink_to_fit(image, (1200, 600))
     width = image.shape[1]
     height = image.shape[0]
 
@@ -111,12 +105,12 @@ def main(file_path: Path) -> None:
 
     sliders_window_name = 'sliders'
     cv.namedWindow(sliders_window_name)
-    cv.resizeWindow(sliders_window_name, 500, 400)
+    cv.resizeWindow(sliders_window_name, 500, 350)
 
-    cv.createTrackbar('block size', sliders_window_name, model.blockSize, 100, model.set_blockSize)
-    cv.createTrackbar('ksize', sliders_window_name, model.ksize, 31, model.set_ksize)
-    cv.createTrackbar('k * 1000', sliders_window_name, int(model.k * 1000), 100, model.set_k)
-    cv.createTrackbar('threshold * 1000', sliders_window_name, int(model.threshold * 1000), 100, model.set_threshold)
+    cv.createTrackbar('max corners', sliders_window_name, model.maxCorners, 100, model.set_maxCorners)
+    cv.createTrackbar('quality level', sliders_window_name, int(1000 * model.qualityLevel), 1000,
+                      model.set_qualityLevel)
+    cv.createTrackbar('min distance', sliders_window_name, int(model.minDistance), 100, model.set_minDistance)
     cv.createTrackbar('rotation', sliders_window_name, model.rotation, 360, model.set_rotation)
     cv.createTrackbar('a1', sliders_window_name, model.a1, 100, model.set_a1)
     cv.createTrackbar('a2', sliders_window_name, model.a2, 100, model.set_a2)

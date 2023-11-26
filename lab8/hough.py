@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 
-RHO = 1
+RHO = 1.5
 ANGLE = np.pi / 180
 THR = 100
 MIN_LINE_LENGTH = 50

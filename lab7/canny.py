@@ -113,7 +113,7 @@ class CannyViewModel:
 
 
 if __name__ == '__main__':
-    img_path = '../imgs/triangle.jpg'
+    img_path = '../imgs/Venus_from_Mariner_10.jpg'
 
     canny_view_model = CannyViewModel(img_path)
     canny_view_model.run()

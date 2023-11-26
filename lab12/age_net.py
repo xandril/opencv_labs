@@ -24,7 +24,7 @@ def highlightFace(net, frame, conf_threshold=0.7):
 
 if __name__ == '__main__':
 
-    image_file_path = '../imgs/girl1.jpg'
+    image_file_path = '../imgs/ffs.jpg'
 
     faceProto = "models/opencv_face_detector.pbtxt"
     faceModel = "models/opencv_face_detector_uint8.pb"
