@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 
 
 class CannyViewModel:
@@ -19,18 +18,40 @@ class CannyViewModel:
         self._fig_image: cv2.typing.MatLike = None
         self._fig_name = "figures"
 
+        self._min_contour_area = 30
+        self._min_contour_vertices_count = 8
+        self._max_contour_vertices_count = 30
+
     def run(self):
         cv2.imshow(self._img_name, self._img)
 
-        cv2.createTrackbar('lower_thr', self._img_name, 0, 255, self.left_callback)
-        cv2.createTrackbar('upper_thr', self._img_name, 0, 255, self.right_callback)
+        cv2.createTrackbar('lower_canny_thr', self._img_name, 0, 255, self.left_canny_callback)
+        cv2.createTrackbar('upper_canny_thr', self._img_name, 0, 255, self.right_canny_callback)
+        cv2.createTrackbar('min_contour_vertices_count_thr', self._img_name, 0, 255,
+                           self.min_contour_vertices_count_callback)
+        cv2.createTrackbar('max_contour_vertices_count_thr', self._img_name, 0, 255,
+                           self.max_contour_vertices_count_callback)
+        cv2.createTrackbar('min contour are', self._img_name, 0, 255,
+                           self.min_contour_area_callback)
         cv2.waitKey(0)
 
-    def left_callback(self, pos: int) -> None:
+    def min_contour_area_callback(self, pos: int) -> None:
+        self._min_contour_area = pos
+        self._apply_canny(left_thr=self._left_pos, right_thr=self._right_pos, img=self._img)
+
+    def min_contour_vertices_count_callback(self, pos: int) -> None:
+        self._min_contour_vertices_count = pos
+        self._apply_canny(left_thr=self._left_pos, right_thr=self._right_pos, img=self._img)
+
+    def max_contour_vertices_count_callback(self, pos: int) -> None:
+        self._max_contour_vertices_count = pos
+        self._apply_canny(left_thr=self._left_pos, right_thr=self._right_pos, img=self._img)
+
+    def left_canny_callback(self, pos: int) -> None:
         self._left_pos = pos
         self._apply_canny(left_thr=self._left_pos, right_thr=self._right_pos, img=self._img)
 
-    def right_callback(self, pos: int) -> None:
+    def right_canny_callback(self, pos: int) -> None:
         self._right_pos = pos
         self._apply_canny(left_thr=self._left_pos, right_thr=self._right_pos, img=self._img)
 
@@ -58,52 +79,42 @@ class CannyViewModel:
     def _approx_contours(self):
         fig_img = self._img.copy()
         edges = self._edges.copy()
-        # dilated = edges
-
-        # cv2.imshow('delated', dilated)
 
         contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        print('counter number: ', len(contours))
-
-        ref_triangle = np.array([[0, 0], [0, 50], [50, 50]], dtype=np.int32)
-        ref_rectangle = np.array([[0, 0], [0, 50], [50, 50], [50, 0]], dtype=np.int32)
-        ref_ellipse = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (50, 50))
-
-        # Compute Hu Moments of reference shapes
-        moments_triangle = cv2.HuMoments(cv2.moments(ref_triangle)).flatten()
-        moments_rectangle = cv2.HuMoments(cv2.moments(ref_rectangle)).flatten()
-        moments_ellipse = cv2.HuMoments(cv2.moments(ref_ellipse)).flatten()
-
+        print('contour number: ', len(contours))
+        circle_contour_list = []
+        circle_contour_area = []
         for contour in contours:
-            # Approximate the contour
-            moments_cnt = cv2.HuMoments(cv2.moments(contour)).flatten()
+            area = cv2.contourArea(contour)
+            approx = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, True), True)
+            if (self._max_contour_vertices_count > len(approx) > self._min_contour_vertices_count) and (
+                    area > self._min_contour_area):
+                circle_contour_list.append(contour)
+                circle_contour_area.append(area)
 
-            # Compute shape similarity with reference shapes
-            similarity_triangle = cv2.matchShapes(moments_cnt, moments_triangle, cv2.CONTOURS_MATCH_I2, 0)
-            similarity_rectangle = cv2.matchShapes(moments_cnt, moments_rectangle, cv2.CONTOURS_MATCH_I2, 0)
-            similarity_ellipse = cv2.matchShapes(moments_cnt, moments_ellipse, cv2.CONTOURS_MATCH_I2, 0)
+        print('final contour number: ', len(circle_contour_list))
 
+        img_area = fig_img.shape[0] * fig_img.shape[1]
+        for contour in circle_contour_list:
             x, y, w, h = cv2.boundingRect(contour)
-            text = 'idk'
-            sim = 0.01
-            res_sim = 42
-            # Check if contour is a triangle
-            if similarity_triangle < sim:
-                text = 'triangle'
-                res_sim = similarity_triangle
-            # Check if contour is a rectangle
-            elif similarity_rectangle < sim:
-                text = 'rectangle'
-                res_sim = similarity_rectangle
+            bb_area = w * h
 
-            # Check if contour is an ellipse
-            elif similarity_ellipse < sim:
-                text = 'ellipse'
-                res_sim = similarity_ellipse
-            text += str(res_sim)
+            area_ratio = 100 * bb_area / img_area
+            print('area_ratio: ', area_ratio)
+            if area_ratio > 75:
+                size = 'big'
+            elif 50 < area_ratio < 75:
+                size = 'medium'
+            elif 25 < area_ratio < 50:
+                size = 'small'
+            else:
+                size = 'very small'
+
+            text = f'ellipse,{size}'
+            cv2.putText(fig_img, text, (x + w // 4, y + h // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                        cv2.LINE_AA)
             cv2.drawContours(fig_img, [contour], 0, (0, 255, 0), 1)
-            cv2.putText(fig_img, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
 
         self._fig_image = fig_img
         cv2.imshow(self._fig_name, self._fig_image)
